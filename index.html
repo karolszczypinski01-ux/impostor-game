@@ -1,87 +1,116 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Impostor Game</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            padding: 20px;
-        }
-        button {
-            padding: 10px 20px;
-            margin: 10px;
-        }
-        #card {
-            margin-top: 20px;
-            font-size: 24px;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Friends Voting Game</title>
+<style>
+body{font-family:Arial,sans-serif;max-width:800px;margin:auto;padding:20px}
+button,input{padding:10px;margin:5px}
+#players div{padding:4px}
+</style>
 </head>
 <body>
+<h1>Friends Voting Game</h1>
 
-<h1>Impostor Game</h1>
+<p>Replace the Firebase config below with your own if needed.</p>
 
-<label>Players:</label>
-<input type="number" id="players" value="5" min="3">
+<input id="name" placeholder="Your name">
+<button onclick="joinGame()">Join</button>
 
-<button onclick="startGame()">Start Game</button>
-<button onclick="resetGame()">Reset</button>
+<h2>Players</h2>
+<div id="players"></div>
 
-<div id="card"></div>
+<button onclick="startVote()">Start</button>
+<div id="startStatus"></div>
 
-<script>
-const words = [
-    "Pizza",
-    "Tiger",
-    "Football",
-    "Castle",
-    "Rocket"
-];
+<button onclick="voteMode()">Vote Mode</button>
+<div id="voteStatus"></div>
 
-let currentPlayer = 0;
-let totalPlayers = 0;
-let impostor = 0;
-let word = "";
+<button onclick="endVote()">End Game</button>
+<div id="endStatus"></div>
 
-function startGame() {
-    totalPlayers = Number(document.getElementById("players").value);
-    currentPlayer = 1;
-    impostor = Math.floor(Math.random() * totalPlayers) + 1;
-    word = words[Math.floor(Math.random() * words.length)];
+<h2 id="status">Waiting...</h2>
 
-    showPlayer();
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBtbS-PKn6KHYxv5C5oxbnW6qyq7tNjIUo",
+  authDomain: "imporstor-77552.firebaseapp.com",
+  databaseURL: "https://imporstor-77552-default-rtdb.firebaseio.com",
+  projectId: "imporstor-77552",
+  storageBucket: "imporstor-77552.firebasestorage.app",
+  messagingSenderId: "988501455649",
+  appId: "1:988501455649:web:cb1004d35d3c0af05c4460",
+  measurementId: "G-Z99981M72P"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+let playerName = "";
+
+window.joinGame = async function () {
+  playerName = document.getElementById("name").value.trim();
+  if (!playerName) return;
+  await set(ref(db, "room/players/" + playerName), { name: playerName });
+};
+
+window.startVote = async function () {
+  if (!playerName) return;
+  await set(ref(db, "room/startVotes/" + playerName), true);
+};
+
+window.voteMode = async function () {
+  if (!playerName) return;
+  await set(ref(db, "room/voteModeVotes/" + playerName), true);
+};
+
+window.endVote = async function () {
+  if (!playerName) return;
+  await set(ref(db, "room/endVotes/" + playerName), true);
+};
+
+function majority(n){
+  return Math.floor(n/2)+1;
 }
 
-function showPlayer() {
-    const card = document.getElementById("card");
+onValue(ref(db,"room"), snap => {
+  const room = snap.val() || {};
+  const players = room.players ? Object.values(room.players) : [];
 
-    if (currentPlayer > totalPlayers) {
-        card.innerHTML = "Everyone has seen their role!";
-        return;
-    }
+  document.getElementById("players").innerHTML =
+    players.map(p => `<div>${p.name}</div>`).join("");
 
-    let text =
-        currentPlayer === impostor
-        ? "You are the IMPOSTOR!"
-        : "Word: " + word;
+  const total = players.length;
 
-    card.innerHTML = `
-        <h2>Player ${currentPlayer}</h2>
-        <p>${text}</p>
-        <button onclick="nextPlayer()">Next Player</button>
-    `;
-}
+  const starts = room.startVotes ? Object.keys(room.startVotes).length : 0;
+  document.getElementById("startStatus").textContent =
+    `${starts}/${total} started`;
 
-function nextPlayer() {
-    currentPlayer++;
-    showPlayer();
-}
+  const votes = room.voteModeVotes ? Object.keys(room.voteModeVotes).length : 0;
+  document.getElementById("voteStatus").textContent =
+    `${votes}/${majority(Math.max(total,1))} needed`;
 
-function resetGame() {
-    document.getElementById("card").innerHTML = "";
-}
+  const ends = room.endVotes ? Object.keys(room.endVotes).length : 0;
+  document.getElementById("endStatus").textContent =
+    `${ends}/${majority(Math.max(total,1))} needed`;
+
+  let status = "Waiting...";
+
+  if (total > 0 && starts === total) status = "Game Started!";
+  if (votes >= majority(Math.max(total,1))) status = "Voting Mode Active!";
+  if (ends >= majority(Math.max(total,1))) status = "Game Ended!";
+
+  document.getElementById("status").textContent = status;
+});
 </script>
-
 </body>
 </html>
